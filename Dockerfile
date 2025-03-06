@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 ADD main.py /app/main.py
-ADD src/requirements.txt /app/requirements.txt
+ADD requirements.txt /app/requirements.txt
 WORKDIR /app
 
 RUN pip3 install -r requirements.txt
