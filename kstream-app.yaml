@@ -15,6 +15,4 @@ spec:
     spec:
       containers:
         - name: kstream-app
-          image: #You application image
-      imagePullSecrets:
-        - name: #Your service account JSON key secret
+          image: <ACR_NAME>/stream-app:latest
