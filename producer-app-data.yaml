@@ -31,7 +31,7 @@ spec:
         - -c
         - |
           kafka-producer-perf-test \
-            --topic ${HOSTNAME}  \
+            --topic elastic-0 \
             --record-size 64 \
             --throughput 1 \
             --producer.config /mnt/kafka.properties \
@@ -42,7 +42,10 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: 512Mi # 768Mi
+            memory: 400Mi # 768Mi
+            cpu: 100m # 1000m
+          limits:
+            memory: 700Mi # 768Mi
             cpu: 500m # 1000m
       volumes:
         - name: kafka-properties # Create secret with name `kafka-client-config` with client configurations
