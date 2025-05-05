@@ -41,7 +41,7 @@ metadata:
 spec:
   replicas: 1
   image:
-    application: <ACR_NAME>/azure-connector:latest
+    application: edgarasdir/kafkastream:latest
     init: confluentinc/confluent-init-container:2.10.0
   dependencies:
     kafka:

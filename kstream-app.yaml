@@ -15,4 +15,4 @@ spec:
     spec:
       containers:
         - name: kstream-app
-          image: <ACR_NAME>/stream-app:latest
+          image: edgarasdir/kafkastream:third

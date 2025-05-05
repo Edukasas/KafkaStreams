@@ -1,6 +1,6 @@
-FROM python:3.12-slim
+FROM python:3.9-slim
 
-ADD src/main /app/main.py
+ADD src/main.py /app/main.py
 ADD requirements.txt /app/requirements.txt
 WORKDIR /app
 

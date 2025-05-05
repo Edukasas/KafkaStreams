@@ -18,23 +18,31 @@ resource "random_pet" "random_suffix" {
   }
 }
 
-resource "google_container_registry" "registry" {
-  project    = var.project
-  depends_on = [google_project_service.container_registry_service]
+resource "google_project_service" "artifact_registry_service" {
+  service                    = "artifactregistry.googleapis.com"
+  disable_dependent_services = true
+}
+
+resource "google_artifact_registry_repository" "registry" {
+  location      = var.region
+  repository_id = "docker-repo-${random_pet.random_suffix.id}"
+  format        = "DOCKER"
+  depends_on    = [google_project_service.artifact_registry_service]
 }
 
 resource "google_service_account" "service_account" {
-  account_id   = "gcs-${random_pet.random_suffix.id}-rw"
-  display_name = "Service Account for RW"
+  account_id   = "ar-${random_pet.random_suffix.id}-rw"
+  display_name = "Service Account for Artifact Registry RW"
 }
 
-resource "google_storage_bucket_iam_binding" "binding" {
-  bucket = google_container_registry.registry.id
-  role   = "roles/storage.admin"
-  members = [
+resource "google_artifact_registry_repository_iam_binding" "binding" {
+  location   = google_artifact_registry_repository.registry.location
+  repository = google_artifact_registry_repository.registry.name
+  role       = "roles/artifactregistry.writer"
+  members    = [
     "serviceAccount:${google_service_account.service_account.email}",
   ]
-  depends_on = [google_container_registry.registry, google_service_account.service_account]
+  depends_on = [google_artifact_registry_repository.registry, google_service_account.service_account]
 }
 
 resource "google_container_cluster" "kubernetes_cluster" {
@@ -45,15 +53,10 @@ resource "google_container_cluster" "kubernetes_cluster" {
     machine_type    = "n1-standard-4"
     service_account = google_service_account.service_account.email
   }
-  depends_on = [google_project_service.container_service, google_storage_bucket_iam_binding.binding]
+  depends_on = [google_project_service.container_service, google_artifact_registry_repository_iam_binding.binding]
 }
 
 resource "google_project_service" "container_service" {
   service                    = "container.googleapis.com"
-  disable_dependent_services = true
-}
-
-resource "google_project_service" "container_registry_service" {
-  service                    = "containerregistry.googleapis.com"
   disable_dependent_services = true
 }

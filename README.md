@@ -1,131 +1,213 @@
-# M12_KafkaStreams_JVM_GCP
-1) Create your own project on GCP (currently Google offers trial accounts up to 300$).
-2) Install Google Cloud CLI (gcloud & gsutil), Kubernetes controls (kubectl) and spark on your host machine.
-3) Use `gcloud auth login && gcloud auth application-default login && gcloud config set project [PROJECT]` to initialize access to your project.
-4) Run `terraform init && terraform apply`. Provide your project ID and already **existing** bucket for Terraform state. Terraform script will create a K8S cluster, container registry, GCS bucket for the registry and a service account with RW permission for the Container Registry.
-5) Run `gcloud container clusters get-credentials [CLUSTER_NAME] --zone [CLUSTER_ZONE] --project [PROJECT]` to configure kubectl to work with your k8s cluster.
-6) After the task is done don't forget to `terraform destroy` your GCP resources.
+# Kafka Streams
 
-# Kafka connect in Kubernetes
+## 1. Create your own project on GCP
 
-## Install Confluent Hub Client
+I created an account with free trial on gcp
 
-You can find the installation manual [here](https://docs.confluent.io/home/connect/confluent-hub/client.html)
+## 2. Install Google Cloud CLI (gcloud & gsutil), Kubernetes controls (kubectl) and spark on your host machine.
 
-## Create a custom docker image
+Installed everything
 
-For running the GCS connector, you can create your own docker image. Create your GCS connector image and build it.
+## 3. Use gcloud auth login && gcloud auth application-default login && gcloud config set project [PROJECT] to initialize access to your project.
 
-## Launch Confluent for Kubernetes
+Setup everything
 
-### Create a namespace
+## 4. Run terraform init && terraform apply. Provide your project ID and already existing bucket for Terraform state. Terraform script will create a K8S cluster, a GCS bucket and a service account with RW permission for the bucket.
 
-- Create the namespace to use:
+1. Navigate to the `terraform` folder.
+2. Run the following commands:
+    ```bash
+    terraform init
+    terraform apply
+    ```
 
-  ```cmd
-  kubectl create namespace confluent
-  ```
+## 5. Run gcloud container clusters get-credentials [CLUSTER_NAME] --zone [CLUSTER_ZONE] --project [PROJECT] to configure kubectl to work with your k8s cluster.  
 
-- Set this namespace to default for your Kubernetes context:
+Ran the commands
 
-  ```cmd
-  kubectl config set-context --current --namespace confluent
-  ```
+## 6. Create a namespace
 
-### Install Confluent for Kubernetes
+Create the namespace to use:
+```bash
+kubectl create namespace confluent
+```
 
-- Add the Confluent for Kubernetes Helm repository:
+Set this namespace to default for your Kubernetes context:
+```bash
+kubectl config set-context --current --namespace confluent
+```
 
-  ```cmd
-  helm repo add confluentinc https://packages.confluent.io/helm
-  helm repo update
-  ```
+## 7. Install Confluent for Kubernetes
 
-- Install Confluent for Kubernetes:
+Add the Confluent for Kubernetes Helm repository:
+```bash
+helm repo add confluentinc https://packages.confluent.io/helm
+helm repo update
+```
 
-  ```cmd
-  helm upgrade --install confluent-operator confluentinc/confluent-for-kubernetes
-  ```
+Install Confluent for Kubernetes:
+```bash
+helm upgrade --install confluent-operator confluentinc/confluent-for-kubernetes
+```
 
-## Create your own connector's image
+## 8. Create your own connector's image
 
-- Create your own connector's docker image using provided Dockerfile and use it in confluent-platform.yaml
+I created and pushed the image with these commands:
+```bash
+docker build -t kafkastream:latest .
+docker push edgarasdir/kafkastream:latest
+```
 
-### Install Confluent Platform
+## 9. Install Confluent Platform
 
-- Install all Confluent Platform components:
+Before applying this file I modified it:
+```bash
+confluent-platform.yaml
+```
 
-  ```cmd
-  kubectl apply -f ./confluent-platform.yaml
-  ```
+Install all Confluent Platform components:
+```bash
+kubectl apply -f ./confluent-platform.yaml
+```
 
-- Install a sample producer app and topic:
+Install a sample producer app and topic:
+```bash
+kubectl apply -f ./producer-app-data.yaml
+```
 
-  ```cmd
-  kubectl apply -f ./producer-app-data.yaml
-  ```
+Check that everything is deployed:
+```bash
+kubectl get pods -o wide 
+```
 
-- Check that everything is deployed:
+![1](ss/1.png)
 
-  ```cmd
-  kubectl get pods -o wide 
-  ```
+## 10. View Control Center
 
-### View Control Center
+Set up port forwarding to Control Center web UI from local machine:
+```bash
+kubectl port-forward controlcenter-0 9021:9021
+```
 
-- Set up port forwarding to Control Center web UI from local machine:
+Browse to Control Center: http://localhost:9021 
 
-  ```cmd
-  kubectl port-forward controlcenter-0 9021:9021
-  ```
+![2](ss/2.png)
 
-- Browse to Control Center: [http://localhost:9021](http://localhost:9021)
+## 11. Create a kafka topic
 
-## Create a kafka topic
+Create a connection for kafka:
+```bash
+kubectl port-forward connect-0 8083:8083
+```
 
-- Name the new topic: "expedia".
+for Windows OS run the additional command:
+```bash
+Remove-item alias:curl
+```
 
-## Prepare the GCS connector configuration
+execute below command to create Kafka topic with a name 'expedia'
+```bash
+kubectl exec kafka-0 -c kafka -- bash -c "/usr/bin/kafka-topics --create --topic expedia --replication-factor 3 --partitions 3 --bootstrap-server kafka:9092"
+```
 
-- Create a JSON key for the bucket's service account to give GCS connector access.
+## 12. Upload files to GCP
 
-## Upload the connector file through the API
+I just dragged and droped the files to the GCP bucket:
 
-## Implement you KStream application
+![3](ss/3.png)
 
-- Add necessary code and configuration to [KStream Application Class](src/main/java/com/epam/bd201/KStreamsApplication.java)
+## 13. Prepare the GCP connector configuration file
 
-- Build KStream application jar
-  ```cmd
-  $ mvn package
-  ```
+I modified the config file and masked the date_time field:
+```json
+{
+    "name": "expedia",
+    "config": {
+      "connector.class": "GcsSource",
+      "kafka.auth.mode": "SERVICE_ACCOUNT",
+      "format.class": "io.confluent.connect.gcs.format.avro.AvroFormat",
+      "gcs.credentials.json": "",
+      "gcs.bucket.name": "edas-kafka-stream2",
+      "topics.dir": "expedia/",
+      "tasks.max": "1",
+      "transforms": "MaskTime",
+      "transforms.MaskTime.type": "org.apache.kafka.connect.transforms.MaskField$Value",
+      "transforms.MaskTime.fields": "date_time",
+      "transforms.MaskTime.replacement": "0000-00-00 00:00:00"
+    }
+  }
+```
 
-- Build [KStream Docker Image](Dockerfile) - insert valid Container Registry here
-  ```cmd
-  $ docker build -t gcr.io/[your-project-id]/kstream-app:1.0
-  ```
-  
-- Configure your docker for Google Container Registry
-  ```cmd
-  $ gcloud auth configure-docker 
-  ```
+## 14. Upload the connector file through the API
 
-- Push KStream image to Container Registry
-  ```cmd
-  $ docker push gcr.io/[your-project-id]/kstream-app:1.0
-  ```
+I uploaded the file and successfully made a connection:
 
-- Generate a JSON key for created service account and add the key as secret to the K8S cluster:
-  ```
-  $ kubectl create secret docker-registry [key-name] \
-    --docker-server=gcr.io \
-    --docker-username=_json_key \
-    --docker-password="$(cat ./[service-account-key-file.json])" \
-    --docker-email=any@valid.email
-  ```
+```bash
+curl -s -X POST -H "Content-Type:application/json" --data @gcs-source.json http://localhost:8083/connectors
+```
 
-- Run you KStream app container in the K8s kluster alongside with Kafka Connect. Don't forger to update [Kubernetes deployment](kstream-app.yaml)
-  with valid registry for your image as well as created secret
-  ```cmd
-  $ kubectl create -f kstream-app.yaml
-  ```
+![4](ss/4.png)
+
+## 15. Create an output kafka topic
+
+I created an output kafka topic
+
+```bash
+kubectl exec kafka-0 -c kafka -- bash -c "/usr/bin/kafka-topics --create --topic expedia_ext --replication-factor 3 --partitions 3 --bootstrap-server kafka:9092"
+```
+
+## 16. Deploy Stream application
+
+I've modified the src/main.py file to transform the incoming data and output it to expedia_ext.
+I also had to change the requirements.txt, because there were version miss matches and
+had to modify the dockerfile, kstream-app.yaml.
+
+![5](ss/5.png)
+
+## 17. Visualize Data from Kafka Topic expedia_ext with KSQL
+
+I visualized the data using ksql
+
+I started by running the following command to access the KSQL command prompt:
+
+```bash
+kubectl exec -it ksqldb-0 -- ksql
+```
+
+I was redirected to ksql cmd prompt, then I created a stream:
+
+```sql
+    CREATE STREAM expedia_stream (
+        id BIGINT,
+        hotel_id BIGINT,
+        stay_category VARCHAR
+    ) WITH (
+        KAFKA_TOPIC='expedia_ext',
+        VALUE_FORMAT='JSON'
+    );
+```
+
+and after that I created a table:
+
+```sql
+    CREATE TABLE hotels_count AS
+    SELECT
+        stay_category,
+        COUNT(hotel_id) AS hotels_amount,
+        COUNT_DISTINCT(hotel_id) AS distinct_hotels
+    FROM expedia_stream
+    GROUP BY stay_category;
+```
+
+and then I retrieved the total number of hotels and the number of distinct hotels per category:
+
+```sql
+    SELECT * FROM hotels_count EMIT CHANGES;
+```
+
+![6](ss/6.png)
+
+and this is visualization through control-center
+
+![7](ss/7.png)
+![8](ss/8.png)

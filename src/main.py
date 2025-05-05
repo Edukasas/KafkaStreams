@@ -32,7 +32,7 @@ class ExpediaExtRecord(ExpediaRecord):
 
 
 logger = logging.getLogger(__name__)
-app = faust.App('kafkastreams', broker='kafka://kafka:9092')
+app = faust.App('kafkastreams', broker='kafka://kafka-0-internal.confluent.svc.cluster.local:9092')
 source_topic = app.topic('expedia', value_type=ExpediaRecord)
 destination_topic = app.topic('expedia_ext', value_type=ExpediaExtRecord)
 
@@ -45,9 +45,29 @@ async def handle(messages):
             continue
 
         #Transform your records here
+        try:
+            checkin = parse_date(message.srch_ci).date()
+            checkout = parse_date(message.srch_co).date()
+            num_days = (checkout - checkin).days
 
-        yield ExpediaExtRecord(**data, stay_category=stay_category)
+            if num_days > 0 and num_days <= 4:
+                stay_category = 'Short stay'
+            elif num_days > 4 and num_days <= 10:
+                stay_category = 'Standard stay'
+            elif num_days > 10 and num_days <= 14:
+                stay_category = 'Standard extended stay'
+            elif num_days > 14:
+                stay_category = 'Long stay'
+            else:
+                stay_category = 'Erroneous data'
 
+            # Convert original message to dict and extend it
+            data = message.asdict()
+
+            yield ExpediaExtRecord(**data, stay_category=stay_category)
+
+        except Exception as e:
+            logger.error(f"Error processing message {message}: {e}")
 
 if __name__ == '__main__':
     app.main()

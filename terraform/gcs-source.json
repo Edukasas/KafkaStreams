@@ -1,0 +1,16 @@
+{
+    "name": "expedia",
+    "config": {
+      "connector.class": "GcsSource",
+      "kafka.auth.mode": "SERVICE_ACCOUNT",
+      "format.class": "io.confluent.connect.gcs.format.avro.AvroFormat",
+      "gcs.credentials.json": "",
+      "gcs.bucket.name": "edas-kafka-stream2",
+      "topics.dir": "expedia/",
+      "tasks.max": "1",
+      "transforms": "MaskTime",
+      "transforms.MaskTime.type": "org.apache.kafka.connect.transforms.MaskField$Value",
+      "transforms.MaskTime.fields": "date_time",
+      "transforms.MaskTime.replacement": "0000-00-00 00:00:00"
+    }
+  }
